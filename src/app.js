@@ -9,7 +9,7 @@ app.use(helmet());
 
 // Rate limiting
 const rateLimit = new Map();
-const WINDOW_MS = 15 * 60 * 1000;
+const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
 const MAX_REQUESTS = 100;
 
 app.use((req, res, next) => {
@@ -47,5 +47,17 @@ app.get('/', (req, res) => {
     });
     res.send('DevSecOps Portfolio Demo');
 });
+
+// Error handling
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).send('Something went wrong');
+});
+
+if (require.main === module) {
+    app.listen(port, () => {
+        console.log(`App running on port ${port}`);
+    });
+}
 
 module.exports = app;
