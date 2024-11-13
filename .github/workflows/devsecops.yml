@@ -1,0 +1,33 @@
+name: DevSecOps Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      # Run security script
+      - name: Run Security Checks
+        run: |
+          chmod +x ./security/scripts/security-checks.sh
+          ./security/scripts/security-checks.sh
+        
+      # SAST with Semgrep
+      - name: Static Analysis
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: ./security/config/semgrep.yaml
+          
+      # Container scan
+      - name: Build and Scan Container
+        run: |
+          docker build -t demo-app:${{ github.sha }} .
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image demo-app:${{ github.sha }}
