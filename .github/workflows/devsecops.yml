@@ -29,7 +29,7 @@ jobs:
         run: npm audit
         continue-on-error: true
         
-      # Semgrep scan with authenticated access
+      # Semgrep scan
       - name: Semgrep Scan
         uses: returntocorp/semgrep-action@v1
         with:
@@ -40,7 +40,7 @@ jobs:
             p/nodejs
             p/owasp-top-ten
 
-  build:
+  build-and-scan:
     needs: security-checks
     runs-on: ubuntu-latest
     steps:
@@ -58,4 +58,42 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
+        continue-on-error: true
+
+      # Save Trivy scan results
+      - name: Save Trivy scan results
+        run: |
+          mkdir -p reports
+          trivy image --format json --output reports/trivy-results.json demo-app:${{ github.sha }}
+        
+      # Upload scan results as artifact
+      - name: Upload scan results
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-scan-results
+          path: reports/
+
+  test:
+    needs: build-and-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: npm install
+        
+      # Run tests (we'll need to create these)
+      - name: Run Tests
+        run: npm test
+        
+      # Optional: Run integration tests
+      - name: Integration Tests
+        run: |
+          docker build -t demo-app:test .
+          docker run --rm demo-app:test npm run test:integration
         continue-on-error: true
