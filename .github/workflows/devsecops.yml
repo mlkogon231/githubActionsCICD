@@ -40,9 +40,12 @@ jobs:
             p/nodejs
             p/owasp-top-ten
 
-  build:
+  build-and-scan:
     needs: security-checks
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      packages: read
     steps:
       - uses: actions/checkout@v3
       
@@ -53,18 +56,48 @@ jobs:
       - name: Create results directory
         run: mkdir -p results
 
-      # Run Trivy scan and explicitly save results
+      # Run Trivy scan and save results
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
+        continue-on-error: true  # Allow the pipeline to continue even if vulnerabilities are found
         with:
           image-ref: 'demo-app:${{ github.sha }}'
           format: 'sarif'
           output: 'results/trivy-results.sarif'
-          exit-code: '1'
-          ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
-        continue-on-error: true
+          ignore-unfixed: true
 
-      # Debug: List contents of results directory
-      - name: List results directory
-        run: ls -la results/
+      # Print Trivy results to console for visibility
+      - name: Run Trivy vulnerability scanner (Console output)
+        uses: aquasecurity/trivy-action@master
+        continue-on-error: true
+        with:
+          image-ref: 'demo-app:${{ github.sha }}'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+          
+      # Upload Trivy scan results
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: results/trivy-results.sarif
+          category: trivy-results
+
+  test:
+    needs: build-and-scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Run tests
+        run: npm test
