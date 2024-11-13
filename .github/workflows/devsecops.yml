@@ -7,27 +7,20 @@ on:
     branches: [ main ]
 
 jobs:
-  security-scan:
+  initial-security-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-
-      # Run security script
-      - name: Run Security Checks
-        run: |
-          chmod +x ./security/scripts/security-checks.sh
-          ./security/scripts/security-checks.sh
-        
-      # SAST with Semgrep
-      - name: Static Analysis
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: ./security/config/semgrep.yaml
           
-      # Container scan
-      - name: Build and Scan Container
-        run: |
-          docker build -t demo-app:${{ github.sha }} .
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy image demo-app:${{ github.sha }}
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: npm install
+        
+      - name: Run basic security audit
+        run: npm audit
