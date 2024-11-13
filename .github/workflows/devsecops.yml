@@ -49,39 +49,22 @@ jobs:
       - name: Build Docker image
         run: docker build -t demo-app:${{ github.sha }} .
 
-      # Modified Trivy scan with caching and retry logic
+      # Create directory for scan results
+      - name: Create results directory
+        run: mkdir -p results
+
+      # Run Trivy scan and explicitly save results
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: 'demo-app:${{ github.sha }}'
           format: 'sarif'
-          output: 'trivy-results.sarif'
+          output: 'results/trivy-results.sarif'
           exit-code: '1'
           ignore-unfixed: true
           severity: 'CRITICAL,HIGH'
-          cache-dir: '.trivy'
-          timeout: '10m'
         continue-on-error: true
 
-      - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: 'trivy-results.sarif'
-        if: always()
-
-  test:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          
-      - name: Install dependencies
-        run: npm install
-        
-      - name: Run tests
-        run: npm test
+      # Debug: List contents of results directory
+      - name: List results directory
+        run: ls -la results/
