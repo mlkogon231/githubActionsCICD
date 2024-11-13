@@ -7,8 +7,10 @@ on:
     branches: [ main ]
 
 jobs:
-  initial-security-check:
+  security-checks:
     runs-on: ubuntu-latest
+    permissions:
+      security-events: write
     steps:
       - uses: actions/checkout@v3
         with:
@@ -22,5 +24,38 @@ jobs:
       - name: Install dependencies
         run: npm install
         
-      - name: Run basic security audit
+      # Basic security check
+      - name: Run npm audit
         run: npm audit
+        continue-on-error: true
+        
+      # Semgrep scan with authenticated access
+      - name: Semgrep Scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          publishToken: ${{ secrets.SEMGREP_APP_TOKEN }}
+          publishDeployment: ${{ secrets.SEMGREP_APP_TOKEN != '' }}
+          config: >-
+            p/javascript
+            p/nodejs
+            p/owasp-top-ten
+
+  build:
+    needs: security-checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build Docker image
+        run: docker build -t demo-app:${{ github.sha }} .
+        
+      # Container security scan
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'demo-app:${{ github.sha }}'
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
+        continue-on-error: true
